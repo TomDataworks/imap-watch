@@ -31,6 +31,7 @@ struct globals {
   char * host;
   char * port;
   int keepalive;
+  int resync;
   char * command;
 } globals = {
   .user = NULL,
@@ -39,7 +40,8 @@ struct globals {
   .host = "imap.gmail.com",
   .port = "imaps",
   .keepalive = 300,
-  .command = "/usr/local/bin/mbsync gmail"
+  .command = "/usr/local/bin/mbsync gmail",
+  .resync = 6
 };
 
 unsigned int tag = 0;
@@ -62,6 +64,8 @@ static int handler(void* user, const char* section, const char* name,
         config->port = strdup(value);
     } else if (MATCH("imaps", "keepalive")) {
         config->keepalive = atoi(value);
+    } else if (MATCH("imaps", "resync")) {
+        config->resync = 6;
     } else if (MATCH("sync", "command")) {
         config->command = strdup(value);
     } else {
@@ -160,6 +164,8 @@ static void check_messages() {
 }
 
 static void ni_idle(SSL *ssl){
+  int syncs = 0;
+
   ni_imap_cmd(ssl, 1, "IDLE");
 
   while(tag < MAX_TAG_VALUE) {
@@ -169,6 +175,11 @@ static void ni_idle(SSL *ssl){
       printf("; timeout\n");
       fflush(stdout);
       ni_imap_cmd(ssl, 0, "DONE");
+      if (globals.resync > 0 && syncs >= globals.resync) {
+        printf("; checking messages anyway, too many timeouts.\n");
+        fflush(stdout);
+        check_messages();
+      }
       ni_imap_cmd(ssl, 1, "IDLE");
     } else if (rv == XRECV_CLOSED) {
       printf("; ssl read failure, attempting reconnect.\n");
