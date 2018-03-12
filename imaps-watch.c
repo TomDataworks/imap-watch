@@ -179,6 +179,7 @@ static void ni_idle(SSL *ssl){
         printf("; checking messages anyway, too many timeouts.\n");
         fflush(stdout);
         check_messages();
+        syncs = 0;
       }
       ni_imap_cmd(ssl, 1, "IDLE");
     } else if (rv == XRECV_CLOSED) {
