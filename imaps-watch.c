@@ -45,6 +45,7 @@ struct globals {
 };
 
 unsigned int tag = 0;
+int timeouts = 0;
 
 static int handler(void* user, const char* section, const char* name,
                    const char* value)
@@ -148,6 +149,7 @@ static unsigned long parse_message_id(char * buffer){
 }
 
 static void check_messages() {
+  timeouts = 0; // we don't need to resync for a while
   printf("; forking %s...\n", globals.command);
   fflush(stdout);
   int wstatus;
@@ -164,8 +166,6 @@ static void check_messages() {
 }
 
 static void ni_idle(SSL *ssl){
-  int syncs = 0;
-
   ni_imap_cmd(ssl, 1, "IDLE");
 
   while(tag < MAX_TAG_VALUE) {
@@ -175,12 +175,12 @@ static void ni_idle(SSL *ssl){
       printf("; timeout\n");
       fflush(stdout);
       ni_imap_cmd(ssl, 0, "DONE");
-      if (globals.resync > 0 && syncs >= globals.resync) {
+      if (globals.resync > 0 && timeouts == globals.resync) {
         printf("; checking messages anyway, too many timeouts.\n");
         fflush(stdout);
         check_messages();
-        syncs = 0;
       }
+      timeouts++;
       ni_imap_cmd(ssl, 1, "IDLE");
     } else if (rv == XRECV_CLOSED) {
       printf("; ssl read failure, attempting reconnect.\n");
